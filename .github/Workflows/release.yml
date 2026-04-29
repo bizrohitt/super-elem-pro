@@ -1,30 +1,29 @@
-name: 🚀 Auto Version, Build & Release
+name: 🔒 Obfuscate & Build Protected Release
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'README.md'
-      - '.github/**'
-      - 'CHANGELOG.md'
+  # Manual trigger only — run this when you want a protected build
+  workflow_dispatch:
+    inputs:
+      version_override:
+        description: 'Version to obfuscate (leave empty for current)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build and Release Plugin
+  obfuscate:
+    name: Obfuscate PHP and Build Protected ZIP
     runs-on: ubuntu-latest
 
     steps:
 
-      # ─── Step 1: Checkout repository ──────────────────────────
-      - name: 📥 Checkout code
+      # ─── Step 1: Checkout ─────────────────────────────────────
+      - name: 📥 Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       # ─── Step 2: Set up PHP ────────────────────────────────────
       - name: 🐘 Set up PHP 8.1
@@ -35,149 +34,110 @@ jobs:
 
       # ─── Step 3: Install Composer dependencies ─────────────────
       - name: 📦 Install Composer dependencies
-        run: composer install --no-dev --optimize-autoloader --prefer-dist
+        run: composer install --no-dev --optimize-autoloader
 
-      # ─── Step 4: Get current version from plugin file ──────────
-      - name: 🔍 Read current version
-        id: current_version
+      # ─── Step 4: Get version ───────────────────────────────────
+      - name: 🔍 Get version
+        id: get_version
         run: |
           VERSION=$(grep "Version:" super-elem-pro.php | head -1 | awk '{print $NF}')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Current version: $VERSION"
 
-      # ─── Step 5: Auto-bump patch version ───────────────────────
-      - name: 🔢 Bump version number
-        id: bump_version
+      # ─── Step 5: Install yakpro-po (YAK Pro Obfuscator) ───────
+      - name: 🔒 Install YAK Pro PHP Obfuscator
         run: |
-          CURRENT="${{ steps.current_version.outputs.version }}"
-          
-          # Split into major.minor.patch
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          
-          # Bump patch version
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Bumping $CURRENT → $NEW_VERSION"
+          git clone --depth=1 https://github.com/pk-fr/yakpro-po.git /tmp/yakpro-po
+          cd /tmp/yakpro-po
+          composer install --no-dev --quiet
+          chmod +x yakpro-po.php
+          echo "YAK Pro installed"
 
-      # ─── Step 6: Update version in plugin file ─────────────────
-      - name: ✏️ Update version in plugin files
+      # ─── Step 6: Prepare build directory ──────────────────────
+      - name: 📁 Prepare build directory
         run: |
-          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
+          mkdir -p /tmp/obfuscated/super-elem-pro
           
-          # Update main plugin file — Version header
-          sed -i "s/Version:           .*/Version:           $NEW_VERSION/" super-elem-pro.php
-          
-          # Update SEP_VERSION constant
-          sed -i "s/define( 'SEP_VERSION',      '.*' );/define( 'SEP_VERSION',      '$NEW_VERSION' );/" super-elem-pro.php
-          
-          # Update README.md stable tag
-          sed -i "s/Stable tag: .*/Stable tag: $NEW_VERSION/" README.md
-          
-          echo "Version updated to $NEW_VERSION"
-
-      # ─── Step 7: Update CHANGELOG.md ───────────────────────────
-      - name: 📝 Update CHANGELOG
-        run: |
-          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
-          DATE=$(date +"%Y-%m-%d")
-          
-          # Get recent commit messages since last tag
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$LAST_TAG" ]; then
-            COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"- %s" --no-merges | head -20)
-          else
-            COMMITS=$(git log --pretty=format:"- %s" --no-merges -10)
-          fi
-          
-          # Prepend new changelog entry
-          NEW_ENTRY="## [$NEW_VERSION] - $DATE\n\n$COMMITS\n\n"
-          
-          # Prepend to existing changelog (after the title line)
-          if [ -f CHANGELOG.md ]; then
-            sed -i "1s/^//" CHANGELOG.md
-            echo -e "$NEW_ENTRY$(cat CHANGELOG.md)" > CHANGELOG.md
-          else
-            echo -e "# Changelog\n\n$NEW_ENTRY" > CHANGELOG.md
-          fi
-
-      # ─── Step 8: Commit version bump ───────────────────────────
-      - name: 💾 Commit version bump
-        run: |
-          git config user.name  "GitHub Actions Bot"
-          git config user.email "actions@github.com"
-          git add super-elem-pro.php README.md CHANGELOG.md
-          git commit -m "chore: bump version to ${{ steps.bump_version.outputs.new_version }} [skip ci]"
-          git push origin main
-
-      # ─── Step 9: Create Git tag ────────────────────────────────
-      - name: 🏷️ Create Git tag
-        run: |
-          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
-          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
-          git push origin "v$NEW_VERSION"
-
-      # ─── Step 10: Build production ZIP ────────────────────────
-      - name: 📦 Build production ZIP
-        run: |
-          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
-          ZIP_NAME="super-elem-pro-v$NEW_VERSION.zip"
-          
-          # Create temp build directory
-          mkdir -p /tmp/build/super-elem-pro
-          
-          # Copy plugin files (excluding dev files)
+          # Copy all non-PHP files first (assets, templates, languages, vendor)
           rsync -av \
             --exclude='.git' \
             --exclude='.github' \
-            --exclude='.gitignore' \
-            --exclude='.distignore' \
-            --exclude='node_modules' \
+            --exclude='*.php' \
             --exclude='tests' \
-            --exclude='*.log' \
-            --exclude='phpcs.xml' \
-            --exclude='composer.json' \
-            --exclude='composer.lock' \
-            --exclude='vendor/squizlabs' \
-            --exclude='vendor/wp-coding-standards' \
-            ./ /tmp/build/super-elem-pro/
+            ./ /tmp/obfuscated/super-elem-pro/
+
+      # ─── Step 7: Obfuscate PHP files ──────────────────────────
+      - name: 🔒 Obfuscate PHP files
+        run: |
+          # Create yakpro config
+          cat > /tmp/yakpro-config.php << 'EOF'
+          <?php
+          // YAK Pro Obfuscator Configuration
+          $conf->shuffle_statements            = true;
+          $conf->obfuscate_string_literal      = true;
+          $conf->obfuscate_loop_statement      = true;
+          $conf->obfuscate_if_statement        = true;
+          $conf->obfuscate_function_name       = false;  // Keep for WP hooks
+          $conf->obfuscate_class_name          = false;  // Keep for autoloader
+          $conf->obfuscate_variable_name       = true;
+          $conf->obfuscate_define_name         = false;  // Keep constants readable
+          $conf->obfuscate_comment             = true;   // Remove comments
+          $conf->obfuscate_namespace           = false;  // Keep namespaces
+          $conf->strip_indentation             = true;
+          EOF
           
-          # Create ZIP
-          cd /tmp/build
+          # Obfuscate each PHP file
+          find . -name "*.php" \
+            -not -path './.git/*' \
+            -not -path './vendor/*' \
+            -not -path './tests/*' | while read -r php_file; do
+            
+            # Get relative path
+            rel_path="${php_file#./}"
+            
+            # Create output directory
+            mkdir -p "/tmp/obfuscated/super-elem-pro/$(dirname "$rel_path")"
+            
+            # Obfuscate the file
+            php /tmp/yakpro-po/yakpro-po.php \
+              --config /tmp/yakpro-config.php \
+              "$php_file" \
+              -o "/tmp/obfuscated/super-elem-pro/$rel_path" 2>/dev/null || \
+            # If obfuscation fails, copy as-is
+            cp "$php_file" "/tmp/obfuscated/super-elem-pro/$rel_path"
+            
+          done
+          
+          echo "✅ PHP obfuscation complete"
+
+      # ─── Step 8: Copy vendor (already optimized) ──────────────
+      - name: 📦 Copy vendor directory
+        run: |
+          rsync -av \
+            --exclude='squizlabs' \
+            --exclude='wp-coding-standards' \
+            ./vendor/ /tmp/obfuscated/super-elem-pro/vendor/
+
+      # ─── Step 9: Create obfuscated ZIP ────────────────────────
+      - name: 📦 Create obfuscated ZIP
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          ZIP_NAME="super-elem-pro-v${VERSION}-protected.zip"
+          
+          cd /tmp/obfuscated
           zip -r "$ZIP_NAME" super-elem-pro/
           
-          # Move ZIP to workspace
           mv "$ZIP_NAME" "$GITHUB_WORKSPACE/"
-          
-          echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
-          echo "✅ ZIP created: $ZIP_NAME"
+          echo "✅ Protected ZIP created: $ZIP_NAME"
 
-      # ─── Step 11: Create GitHub Release ───────────────────────
-      - name: 🎉 Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.bump_version.outputs.new_version }}
-          name: Super Elem Pro v${{ steps.bump_version.outputs.new_version }}
-          body: |
-            ## 🚀 Super Elem Pro v${{ steps.bump_version.outputs.new_version }}
-            
-            **Author:** Rohit  
-            **Release Date:** ${{ env.DATE }}  
-            **Type:** Automatic Release
-            
-            ### What's in this release
-            See [CHANGELOG.md](CHANGELOG.md) for full details.
-            
-            ### Installation
-            1. Download `super-elem-pro-v${{ steps.bump_version.outputs.new_version }}.zip` below
-            2. Go to WordPress Admin → Plugins → Add New → Upload Plugin
-            3. Upload the ZIP file and activate
-            
-            > ⚠️ **Personal Use Only** — This plugin is for personal use by Rohit only.
-          files: super-elem-pro-v${{ steps.bump_version.outputs.new_version }}.zip
-          draft: false
-          prerelease: false
+      # ─── Step 10: Upload obfuscated ZIP to latest release ─────
+      - name: 📤 Upload protected ZIP to GitHub Release
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          ZIP_NAME="super-elem-pro-v${VERSION}-protected.zip"
+          
+          # Upload to the latest release
+          gh release upload "v$VERSION" "$ZIP_NAME" \
+            --clobber \
+            --repo "${{ github.repository }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DATE: ${{ github.event.head_commit.timestamp }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
