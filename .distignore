@@ -1,0 +1,15 @@
+.git
+.github
+.gitignore
+.gitattributes
+.distignore
+composer.json
+composer.lock
+phpcs.xml
+package.json
+package-lock.json
+node_modules
+tests
+bin
+.DS_Store
+Thumbs.db

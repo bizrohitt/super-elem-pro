@@ -1,0 +1,117 @@
+/* Popups */
+.sep-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sep-popup-hidden {
+    display: none !important;
+}
+
+.sep-popup-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.sep-popup-container {
+    position: relative;
+    background: #fff;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: 8px;
+    z-index: 1;
+}
+
+.sep-popup-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 2;
+}
+
+/* Forms */
+.sep-form-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.sep-form-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.sep-field-width-100 {
+    width: 100%;
+}
+
+.sep-field-width-50 {
+    width: calc(50% - 10px);
+}
+
+.sep-field-width-33 {
+    width: calc(33.333% - 14px);
+}
+
+.sep-field-width-25 {
+    width: calc(25% - 15px);
+}
+
+.sep-field {
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.sep-field:focus {
+    outline: none;
+    border-color: #0073aa;
+}
+
+.sep-submit-btn {
+    padding: 12px 30px;
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.sep-submit-btn:hover {
+    background: #005a87;
+}
+
+.sep-message {
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 4px;
+}
+
+.sep-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.sep-error {
+    background: #f8d7da;
+    color: #721c24;
+}
