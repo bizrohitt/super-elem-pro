@@ -22,7 +22,8 @@ jobs:
       - name: 🔍 Get Version
         id: get_version
         run: |
-          VERSION=$(grep "Version:" super-elem-pro.php | head -1 | awk '{print $NF}')
+          # Strip \r to handle Windows line endings safely
+          VERSION=$(grep "Version:" super-elem-pro.php | head -1 | awk '{print $NF}' | tr -d '\r')
           echo "VER=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected Version: $VERSION"
 
