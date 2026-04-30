@@ -21,12 +21,25 @@ class Forms
 
     public function handle_submission()
     {
-        check_ajax_referer('super_elem_pro_nonce', 'nonce');
+        if (empty($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'super_elem_pro_nonce')) {
+            wp_send_json_error(['message' => 'Invalid security token.']);
+        }
 
-        $form_data = $_POST['fields'];
+        $form_id = isset($_POST['form_id']) ? intval($_POST['form_id']) : 0;
+        $fields = isset($_POST['fields']) ? $_POST['fields'] : [];
+
+        // In a real scenario we would fetch form settings here
+        // For now, we execute default actions
+        
         // 1. Save to database
-        // 2. Send Email
-        // 3. Trigger Webhook
+        if (class_exists('\SuperElemPro\Modules\Forms\Actions\DatabaseAction')) {
+            \SuperElemPro\Modules\Forms\Actions\DatabaseAction::save($form_id, $fields);
+        }
+
+        // 2. Send Email (using admin email by default as settings aren't loaded)
+        if (class_exists('\SuperElemPro\Modules\Forms\Actions\EmailAction')) {
+            \SuperElemPro\Modules\Forms\Actions\EmailAction::send($form_id, $fields, []);
+        }
 
         wp_send_json_success(['message' => 'Sent successfully!']);
     }

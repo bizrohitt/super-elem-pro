@@ -3,7 +3,7 @@
  * Plugin Name:       Super Elem Pro
  * Plugin URI:        https://github.com/rohit/super-elem-pro
  * Description:       A powerful personal Elementor addon that unlocks pro-level features using 100% free and open-source resources. Built for personal use by Rohit.
- * Version:           1.0.1
+ * Version:           1.1.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Rohit
@@ -36,7 +36,7 @@ if (!defined('ABSPATH')) {
 // ============================================================
 // CONSTANTS
 // ============================================================
-define('SEP_VERSION', '1.0.0');
+define('SEP_VERSION', '1.1.0');
 define('SEP_PLUGIN_FILE', __FILE__);
 define('SEP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SEP_PLUGIN_URL', plugin_dir_url(__FILE__));

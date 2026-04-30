@@ -14,31 +14,46 @@ class DatabaseAction
 
     public static function save($form_id, $fields)
     {
-        $submission_title = sprintf(
-            __('Submission #%s', 'super-elem-pro'),
-            time()
-        );
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'sep_form_submissions';
 
-        $submission_id = wp_insert_post([
-            'post_type' => 'sep_form_submission',
-            'post_title' => $submission_title,
-            'post_status' => 'publish',
-        ]);
+        $data = [
+            'form_id'    => $form_id,
+            'form_name'  => 'Form ' . $form_id,
+            'fields'     => json_encode($fields),
+            'user_ip'    => self::get_user_ip(),
+            'user_agent' => self::get_user_agent(),
+            'status'     => 'unread',
+            'created_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql'),
+        ];
 
-        if (is_wp_error($submission_id)) {
+        if (is_user_logged_in()) {
+            $data['user_id'] = get_current_user_id();
+        }
+
+        $format = [
+            '%d', // form_id
+            '%s', // form_name
+            '%s', // fields
+            '%s', // user_ip
+            '%s', // user_agent
+            '%s', // status
+            '%s', // created_at
+            '%s', // updated_at
+        ];
+        
+        if (isset($data['user_id'])) {
+            $format[] = '%d';
+        }
+
+        $inserted = $wpdb->insert($table_name, $data, $format);
+
+        if (!$inserted) {
             return false;
         }
 
-        update_post_meta($submission_id, '_sep_form_id', $form_id);
-        update_post_meta($submission_id, '_sep_form_data', $fields);
-        update_post_meta($submission_id, '_sep_submission_date', current_time('mysql'));
-        update_post_meta($submission_id, '_sep_user_ip', self::get_user_ip());
-        update_post_meta($submission_id, '_sep_user_agent', self::get_user_agent());
-        update_post_meta($submission_id, '_sep_referer', wp_get_referer());
-
-        if (is_user_logged_in()) {
-            update_post_meta($submission_id, '_sep_user_id', get_current_user_id());
-        }
+        $submission_id = $wpdb->insert_id;
 
         do_action('sep_after_database_save', $submission_id, $form_id, $fields);
 

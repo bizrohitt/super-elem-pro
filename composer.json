@@ -33,7 +33,10 @@
             "phpcs --config-set installed_paths vendor/wp-coding-standards/wpcs"
         ],
         "lint": "phpcs --standard=WordPress includes/",
-        "lint-fix": "phpcbf --standard=WordPress includes/"
+        "lint-fix": "phpcbf --standard=WordPress includes/",
+        "bump": "php bump-version.php patch",
+        "bump:minor": "php bump-version.php minor",
+        "bump:major": "php bump-version.php major"
     },
     "config": {
         "optimize-autoloader": true,

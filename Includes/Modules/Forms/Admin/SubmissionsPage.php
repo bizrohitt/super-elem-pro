@@ -14,94 +14,87 @@ class SubmissionsPage
 
     public function __construct()
     {
-        add_action('add_meta_boxes', [$this, 'add_meta_boxes']);
-        add_filter('manage_sep_form_submission_posts_columns', [$this, 'set_columns']);
-        add_action('manage_sep_form_submission_posts_custom_column', [$this, 'render_column'], 10, 2);
+        add_action('admin_menu', [$this, 'add_menu_page']);
     }
 
-    public function add_meta_boxes()
+    public function add_menu_page()
     {
-        add_meta_box(
-            'sep_submission_details',
-            __('Submission Details', 'super-elem-pro'),
-            [$this, 'render_submission_details'],
-            'sep_form_submission',
-            'normal',
-            'high'
+        add_submenu_page(
+            'super-elem-pro',
+            __('Form Submissions', 'super-elem-pro'),
+            __('Submissions', 'super-elem-pro'),
+            'manage_options',
+            'sep-form-submissions',
+            [$this, 'render_page']
         );
     }
 
-    public function render_submission_details($post)
+    public function render_page()
     {
-        $form_data = get_post_meta($post->ID, '_sep_form_data', true);
-        $user_ip = get_post_meta($post->ID, '_sep_user_ip', true);
-        $user_agent = get_post_meta($post->ID, '_sep_user_agent', true);
-        $submission_date = get_post_meta($post->ID, '_sep_submission_date', true);
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'sep_form_submissions';
+
+        // Check if table exists
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+            echo '<div class="wrap"><h1>' . esc_html__('Form Submissions', 'super-elem-pro') . '</h1><p>' . esc_html__('Database table not found. Please deactivate and reactivate the plugin.', 'super-elem-pro') . '</p></div>';
+            return;
+        }
+
+        $submissions = $wpdb->get_results("SELECT * FROM $table_name ORDER BY created_at DESC LIMIT 100");
 
         ?>
-        <table class="widefat">
-            <thead>
-                <tr>
-                    <th><?php esc_html_e('Field', 'super-elem-pro'); ?></th>
-                    <th><?php esc_html_e('Value', 'super-elem-pro'); ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (!empty($form_data)): ?>
-                    <?php foreach ($form_data as $field): ?>
-                        <tr>
-                            <td><strong><?php echo esc_html($field['label']); ?></strong></td>
-                            <td><?php echo esc_html($field['value']); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
+        <div class="wrap">
+            <h1 class="wp-heading-inline"><?php esc_html_e('Form Submissions', 'super-elem-pro'); ?></h1>
+            <hr class="wp-header-end">
+            
+            <table class="wp-list-table widefat fixed striped table-view-list">
+                <thead>
                     <tr>
-                        <td colspan="2"><?php esc_html_e('No data available', 'super-elem-pro'); ?></td>
+                        <th scope="col" class="manage-column column-primary"><?php esc_html_e('Form', 'super-elem-pro'); ?></th>
+                        <th scope="col" class="manage-column"><?php esc_html_e('Data', 'super-elem-pro'); ?></th>
+                        <th scope="col" class="manage-column"><?php esc_html_e('IP Address', 'super-elem-pro'); ?></th>
+                        <th scope="col" class="manage-column"><?php esc_html_e('Date', 'super-elem-pro'); ?></th>
                     </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-
-        <h3><?php esc_html_e('Submission Info', 'super-elem-pro'); ?></h3>
-        <table class="widefat">
-            <tbody>
-                <tr>
-                    <td><strong><?php esc_html_e('Date:', 'super-elem-pro'); ?></strong></td>
-                    <td><?php echo esc_html($submission_date); ?></td>
-                </tr>
-                <tr>
-                    <td><strong><?php esc_html_e('IP Address:', 'super-elem-pro'); ?></strong></td>
-                    <td><?php echo esc_html($user_ip); ?></td>
-                </tr>
-                <tr>
-                    <td><strong><?php esc_html_e('User Agent:', 'super-elem-pro'); ?></strong></td>
-                    <td><?php echo esc_html($user_agent); ?></td>
-                </tr>
-            </tbody>
-        </table>
+                </thead>
+                <tbody id="the-list">
+                    <?php if (!empty($submissions)): ?>
+                        <?php foreach ($submissions as $sub): 
+                            $fields = json_decode($sub->fields, true);
+                        ?>
+                            <tr>
+                                <td class="column-primary" data-colname="Form">
+                                    <strong><?php echo esc_html($sub->form_name); ?></strong>
+                                    <div class="row-actions">
+                                        <span class="id">ID: <?php echo esc_html($sub->id); ?></span>
+                                    </div>
+                                </td>
+                                <td data-colname="Data">
+                                    <?php if (!empty($fields) && is_array($fields)): ?>
+                                        <ul style="margin:0;">
+                                        <?php foreach ($fields as $field): ?>
+                                            <li><strong><?php echo esc_html($field['label'] ?? $field['name']); ?>:</strong> <?php echo esc_html($field['value']); ?></li>
+                                        <?php endforeach; ?>
+                                        </ul>
+                                    <?php else: ?>
+                                        <em><?php esc_html_e('No data', 'super-elem-pro'); ?></em>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-colname="IP Address">
+                                    <?php echo esc_html($sub->user_ip); ?>
+                                </td>
+                                <td data-colname="Date">
+                                    <?php echo esc_html(wp_date(get_option('date_format') . ' ' . get_option('time_format'), strtotime($sub->created_at))); ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr class="no-items">
+                            <td class="colspanchange" colspan="4"><?php esc_html_e('No submissions found.', 'super-elem-pro'); ?></td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
         <?php
-    }
-
-    public function set_columns($columns)
-    {
-        $new_columns = [];
-        $new_columns['cb'] = $columns['cb'];
-        $new_columns['title'] = __('Submission', 'super-elem-pro');
-        $new_columns['form_data'] = __('Data', 'super-elem-pro');
-        $new_columns['date'] = __('Date', 'super-elem-pro');
-
-        return $new_columns;
-    }
-
-    public function render_column($column, $post_id)
-    {
-        switch ($column) {
-            case 'form_data':
-                $form_data = get_post_meta($post_id, '_sep_form_data', true);
-                if (!empty($form_data)) {
-                    echo esc_html(count($form_data)) . ' ' . __('fields', 'super-elem-pro');
-                }
-                break;
-        }
     }
 }
