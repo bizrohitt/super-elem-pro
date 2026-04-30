@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: # This adds a manual "Run" button to GitHub
 
 permissions:
   contents: write
@@ -19,33 +20,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 🔍 Read version from PHP
+      - name: 🔍 Read version
         id: get_version
         run: |
-          # This finds the version number in your file
           VERSION=$(grep -m 1 "Version:" super-elem-pro.php | sed 's/[^0-9.]*//g')
           echo "VER=$VERSION" >> $GITHUB_OUTPUT
-          echo "Robot found version: $VERSION"
 
       - name: 📦 Build production ZIP
         run: |
           VERSION="${{ steps.get_version.outputs.VER }}"
           ZIP_NAME="super-elem-pro-v$VERSION.zip"
           mkdir -p build/super-elem-pro
-          # Clean copy (no git, no github folders)
           rsync -av ./ build/super-elem-pro/ --exclude '.git*' --exclude '.github' --exclude 'build'
           cd build && zip -r "../$ZIP_NAME" super-elem-pro/
 
       - name: 🎉 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.get_version.outputs.VER }}
-          name: Super Elem Pro v${{ steps.get_version.outputs.VER }}
-          body: |
-            ## 🚀 New Release: v${{ steps.get_version.outputs.VER }}
-            Manual update by Rohit.
+          tag_name: v${{ steps.get_version.outputs.VER }}-${{ github.run_number }}
+          name: Super Elem Pro v${{ steps.get_version.outputs.VER }} (Build ${{ github.run_number }})
           files: super-elem-pro-v${{ steps.get_version.outputs.VER }}.zip
-          # This forces it to create a NEW release if the version number changed
-          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
