@@ -16,34 +16,36 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 🔍 Read version from PHP
         id: get_version
         run: |
-          # This line is the most important. It finds "Version: X.X.X" and gets the number.
+          # This finds the version number in your file
           VERSION=$(grep -m 1 "Version:" super-elem-pro.php | sed 's/[^0-9.]*//g')
           echo "VER=$VERSION" >> $GITHUB_OUTPUT
-          echo "ROBOT_LOG: The version found in your file is: $VERSION"
+          echo "Robot found version: $VERSION"
 
       - name: 📦 Build production ZIP
         run: |
           VERSION="${{ steps.get_version.outputs.VER }}"
           ZIP_NAME="super-elem-pro-v$VERSION.zip"
           mkdir -p build/super-elem-pro
+          # Clean copy (no git, no github folders)
           rsync -av ./ build/super-elem-pro/ --exclude '.git*' --exclude '.github' --exclude 'build'
           cd build && zip -r "../$ZIP_NAME" super-elem-pro/
 
-      - name: 🎉 Create/Update GitHub Release
+      - name: 🎉 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.get_version.outputs.VER }}
           name: Super Elem Pro v${{ steps.get_version.outputs.VER }}
           body: |
-            ## 🚀 Super Elem Pro v${{ steps.get_version.outputs.VER }}
-            This release was automatically generated based on the version number in your PHP file.
+            ## 🚀 New Release: v${{ steps.get_version.outputs.VER }}
+            Manual update by Rohit.
           files: super-elem-pro-v${{ steps.get_version.outputs.VER }}.zip
-          # This part allows it to overwrite if you push to the same version number
-          prerelease: false
-          draft: false
+          # This forces it to create a NEW release if the version number changed
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
