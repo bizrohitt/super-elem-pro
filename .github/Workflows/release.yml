@@ -4,52 +4,56 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Allows you to click a button to run it manually
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   release:
-    name: Release Plugin
+    name: Build and Release
     runs-on: ubuntu-latest
-
     steps:
-      - name: 📥 Checkout code
+      - name: 📥 Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 🔍 Read version from PHP
+      - name: 🔍 Get Version
         id: get_version
         run: |
-          # Finds the version number in your PHP file
-          VERSION=$(grep -m 1 "Version:" super-elem-pro.php | sed 's/[^0-9.]*//g')
+          VERSION=$(grep "Version:" super-elem-pro.php | head -1 | awk '{print $NF}')
           echo "VER=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected Version: $VERSION"
 
-      - name: 📦 Build production ZIP
+      - name: 📦 Build ZIP
         run: |
           VERSION="${{ steps.get_version.outputs.VER }}"
           ZIP_NAME="super-elem-pro-v$VERSION.zip"
+          
           mkdir -p build/super-elem-pro
-          # Copy only plugin files, ignore git/github/build folders
           rsync -av ./ build/super-elem-pro/ --exclude '.git*' --exclude '.github' --exclude 'build'
-          cd build && zip -r "../$ZIP_NAME" super-elem-pro/
+          
+          cd build
+          zip -r "../$ZIP_NAME" super-elem-pro/
+          cd ..
+          
+          if [ -f "$ZIP_NAME" ]; then
+            echo "✅ ZIP created: $ZIP_NAME"
+          else
+            echo "❌ ZIP creation failed!"
+            exit 1
+          fi
 
-      - name: 🎉 Create/Update GitHub Release
+      - name: 🎉 Create/Update Release
         run: |
           VERSION="${{ steps.get_version.outputs.VER }}"
           ZIP_NAME="super-elem-pro-v$VERSION.zip"
           TAG="v$VERSION"
           
-          # Use GitHub CLI to create or update the release
-          # --clobber overwrites the asset if it already exists
           gh release create "$TAG" "$ZIP_NAME" \
             --title "Super Elem Pro $TAG" \
-            --notes "## 🚀 Latest Build
-          - **Version:** $VERSION
-          - **Build Date:** ${{ github.event.head_commit.timestamp }}
-          - **Note:** This release is automatically updated on every push." \
+            --notes "Automated build for version $VERSION. Pushed to main." \
             --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
