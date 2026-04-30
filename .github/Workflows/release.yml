@@ -1,11 +1,10 @@
-name: 🚀 Auto Version, Build & Release
+name: 🚀 Build & Release (Manual Versioning)
 
 on:
   push:
     branches:
       - main
     paths-ignore:
-      - 'README.md'
       - '.github/**'
       - 'CHANGELOG.md'
 
@@ -14,17 +13,15 @@ permissions:
 
 jobs:
   release:
-    name: Build and Release Plugin
+    name: Release Plugin
     runs-on: ubuntu-latest
 
     steps:
-
       # ─── Step 1: Checkout repository ──────────────────────────
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       # ─── Step 2: Set up PHP ────────────────────────────────────
       - name: 🐘 Set up PHP 8.1
@@ -34,150 +31,50 @@ jobs:
           tools: composer:v2
 
       # ─── Step 3: Install Composer dependencies ─────────────────
-      - name: 📦 Install Composer dependencies
-        run: composer install --no-dev --optimize-autoloader --prefer-dist
-
-      # ─── Step 4: Get current version from plugin file ──────────
-      - name: 🔍 Read current version
-        id: current_version
+      - name: 📦 Install Composer
         run: |
-          VERSION=$(grep "Version:" super-elem-pro.php | head -1 | awk '{print $NF}')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Current version: $VERSION"
-
-      # ─── Step 5: Auto-bump patch version ───────────────────────
-      - name: 🔢 Bump version number
-        id: bump_version
-        run: |
-          CURRENT="${{ steps.current_version.outputs.version }}"
-          
-          # Split into major.minor.patch
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          
-          # Bump patch version
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Bumping $CURRENT → $NEW_VERSION"
-
-      # ─── Step 6: Update version in plugin file ─────────────────
-      - name: ✏️ Update version in plugin files
-        run: |
-          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
-          
-          # Update main plugin file — Version header
-          sed -i "s/Version:           .*/Version:           $NEW_VERSION/" super-elem-pro.php
-          
-          # Update SEP_VERSION constant
-          sed -i "s/define( 'SEP_VERSION',      '.*' );/define( 'SEP_VERSION',      '$NEW_VERSION' );/" super-elem-pro.php
-          
-          # Update README.md stable tag
-          sed -i "s/Stable tag: .*/Stable tag: $NEW_VERSION/" README.md
-          
-          echo "Version updated to $NEW_VERSION"
-
-      # ─── Step 7: Update CHANGELOG.md ───────────────────────────
-      - name: 📝 Update CHANGELOG
-        run: |
-          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
-          DATE=$(date +"%Y-%m-%d")
-          
-          # Get recent commit messages since last tag
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$LAST_TAG" ]; then
-            COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"- %s" --no-merges | head -20)
-          else
-            COMMITS=$(git log --pretty=format:"- %s" --no-merges -10)
-          fi
-          
-          # Prepend new changelog entry
-          NEW_ENTRY="## [$NEW_VERSION] - $DATE\n\n$COMMITS\n\n"
-          
-          # Prepend to existing changelog (after the title line)
-          if [ -f CHANGELOG.md ]; then
-            sed -i "1s/^//" CHANGELOG.md
-            echo -e "$NEW_ENTRY$(cat CHANGELOG.md)" > CHANGELOG.md
-          else
-            echo -e "# Changelog\n\n$NEW_ENTRY" > CHANGELOG.md
+          if [ -f "composer.json" ]; then
+            composer install --no-dev --optimize-autoloader --prefer-dist
           fi
 
-      # ─── Step 8: Commit version bump ───────────────────────────
-      - name: 💾 Commit version bump
+      # ─── Step 4: Get version from plugin file ──────────────────
+      - name: 🔍 Read version from PHP
+        id: get_version
         run: |
-          git config user.name  "GitHub Actions Bot"
-          git config user.email "actions@github.com"
-          git add super-elem-pro.php README.md CHANGELOG.md
-          git commit -m "chore: bump version to ${{ steps.bump_version.outputs.new_version }} [skip ci]"
-          git push origin main
+          # Finds the version number you wrote in the file
+          VERSION=$(grep -m 1 "Version:" super-elem-pro.php | sed 's/[^0-9.]*//g')
+          echo "VER=$VERSION" >> $GITHUB_OUTPUT
+          echo "Target Version: $VERSION"
 
-      # ─── Step 9: Create Git tag ────────────────────────────────
-      - name: 🏷️ Create Git tag
-        run: |
-          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
-          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
-          git push origin "v$NEW_VERSION"
-
-      # ─── Step 10: Build production ZIP ────────────────────────
+      # ─── Step 5: Build production ZIP ─────────────────────────
       - name: 📦 Build production ZIP
         run: |
-          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
-          ZIP_NAME="super-elem-pro-v$NEW_VERSION.zip"
+          VERSION="${{ steps.get_version.outputs.VER }}"
+          ZIP_NAME="super-elem-pro-v$VERSION.zip"
+          mkdir -p build/super-elem-pro
           
-          # Create temp build directory
-          mkdir -p /tmp/build/super-elem-pro
+          # Copy files excluding dev junk
+          rsync -av ./ build/super-elem-pro/ \
+            --exclude '.git*' \
+            --exclude '.github' \
+            --exclude 'build' \
+            --exclude 'composer.*'
           
-          # Copy plugin files (excluding dev files)
-          rsync -av \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='.gitignore' \
-            --exclude='.distignore' \
-            --exclude='node_modules' \
-            --exclude='tests' \
-            --exclude='*.log' \
-            --exclude='phpcs.xml' \
-            --exclude='composer.json' \
-            --exclude='composer.lock' \
-            --exclude='vendor/squizlabs' \
-            --exclude='vendor/wp-coding-standards' \
-            ./ /tmp/build/super-elem-pro/
-          
-          # Create ZIP
-          cd /tmp/build
-          zip -r "$ZIP_NAME" super-elem-pro/
-          
-          # Move ZIP to workspace
-          mv "$ZIP_NAME" "$GITHUB_WORKSPACE/"
-          
-          echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
-          echo "✅ ZIP created: $ZIP_NAME"
+          cd build
+          zip -r "../$ZIP_NAME" super-elem-pro/
 
-      # ─── Step 11: Create GitHub Release ───────────────────────
+      # ─── Step 6: Create GitHub Release ────────────────────────
       - name: 🎉 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.bump_version.outputs.new_version }}
-          name: Super Elem Pro v${{ steps.bump_version.outputs.new_version }}
+          tag_name: v${{ steps.get_version.outputs.VER }}
+          name: Super Elem Pro v${{ steps.get_version.outputs.VER }}
           body: |
-            ## 🚀 Super Elem Pro v${{ steps.bump_version.outputs.new_version }}
-            
-            **Author:** Rohit  
-            **Release Date:** ${{ env.DATE }}  
-            **Type:** Automatic Release
-            
-            ### What's in this release
-            See [CHANGELOG.md](CHANGELOG.md) for full details.
-            
-            ### Installation
-            1. Download `super-elem-pro-v${{ steps.bump_version.outputs.new_version }}.zip` below
-            2. Go to WordPress Admin → Plugins → Add New → Upload Plugin
-            3. Upload the ZIP file and activate
-            
-            > ⚠️ **Personal Use Only** — This plugin is for personal use by Rohit only.
-          files: super-elem-pro-v${{ steps.bump_version.outputs.new_version }}.zip
-          draft: false
-          prerelease: false
+            ## 🚀 Release v${{ steps.get_version.outputs.VER }}
+            Manual versioning release.
+            Author: Rohit
+          files: super-elem-pro-v${{ steps.get_version.outputs.VER }}.zip
+          # If the version tag already exists, this will update the existing release
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DATE: ${{ github.event.head_commit.timestamp }}
