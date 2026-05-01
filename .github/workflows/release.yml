@@ -18,16 +18,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 📝 Debug Info
-        run: |
-          echo "Branch: $(git branch --show-current)"
-          echo "Current Version Line:"
-          grep "Version:" super-elem-pro.php
-
       - name: 🔍 Get Version
         id: get_version
         run: |
-          # Strip \r and extra spaces
+          # Robust version extraction
           VERSION=$(grep "Version:" super-elem-pro.php | head -1 | awk '{print $NF}' | tr -d '\r')
           echo "VER=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected Version: $VERSION"
@@ -42,34 +36,13 @@ jobs:
           cd ..
           if [ -f "$ZIP_NAME" ]; then echo "✅ ZIP created: $ZIP_NAME"; else echo "❌ ZIP failed"; exit 1; fi
 
-      - name: 🏷️ Create and Push Tag
-        run: |
-          VERSION="${{ steps.get_version.outputs.VER }}"
-          TAG="v$VERSION"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Only create and push if the tag doesn't exist on remote
-          if ! git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
-            echo "Creating new tag $TAG"
-            git tag -a "$TAG" -m "Version $VERSION"
-            git push origin "$TAG"
-          else
-            echo "Tag $TAG already exists on remote"
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: 🎉 Create/Update Release
-        run: |
-          VERSION="${{ steps.get_version.outputs.VER }}"
-          ZIP_NAME="super-elem-pro-v$VERSION.zip"
-          TAG="v$VERSION"
-          
-          # Using GH_TOKEN for the CLI explicitly
-          gh release create "$TAG" "$ZIP_NAME" \
-            --title "Super Elem Pro $TAG" \
-            --notes "Automated release for version $VERSION." \
-            --clobber
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "super-elem-pro-v${{ steps.get_version.outputs.VER }}.zip"
+          tag: "v${{ steps.get_version.outputs.VER }}"
+          name: "Super Elem Pro v${{ steps.get_version.outputs.VER }}"
+          body: "Automated build for version ${{ steps.get_version.outputs.VER }}. Pushed to main."
+          allowUpdates: true
+          overwrite: true
+          token: ${{ secrets.GITHUB_TOKEN }}
