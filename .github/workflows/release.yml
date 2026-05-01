@@ -1,4 +1,4 @@
-name: 🚀 Build & Release
+name: 🚀 Release
 
 on:
   push:
@@ -11,7 +11,6 @@ permissions:
 
 jobs:
   release:
-    name: Build and Release
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout
@@ -19,10 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 📝 Debug Info
+        run: |
+          echo "Branch: $(git branch --show-current)"
+          echo "Current Version Line:"
+          grep "Version:" super-elem-pro.php
+
       - name: 🔍 Get Version
         id: get_version
         run: |
-          # Strip \r to handle Windows line endings safely
+          # Strip \r and extra spaces
           VERSION=$(grep "Version:" super-elem-pro.php | head -1 | awk '{print $NF}' | tr -d '\r')
           echo "VER=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected Version: $VERSION"
@@ -31,20 +36,29 @@ jobs:
         run: |
           VERSION="${{ steps.get_version.outputs.VER }}"
           ZIP_NAME="super-elem-pro-v$VERSION.zip"
-          
           mkdir -p build/super-elem-pro
           rsync -av ./ build/super-elem-pro/ --exclude '.git*' --exclude '.github' --exclude 'build'
-          
-          cd build
-          zip -r "../$ZIP_NAME" super-elem-pro/
+          cd build && zip -r "../$ZIP_NAME" super-elem-pro/
           cd ..
+          if [ -f "$ZIP_NAME" ]; then echo "✅ ZIP created: $ZIP_NAME"; else echo "❌ ZIP failed"; exit 1; fi
+
+      - name: 🏷️ Create and Push Tag
+        run: |
+          VERSION="${{ steps.get_version.outputs.VER }}"
+          TAG="v$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          if [ -f "$ZIP_NAME" ]; then
-            echo "✅ ZIP created: $ZIP_NAME"
+          # Only create and push if the tag doesn't exist on remote
+          if ! git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
+            echo "Creating new tag $TAG"
+            git tag -a "$TAG" -m "Version $VERSION"
+            git push origin "$TAG"
           else
-            echo "❌ ZIP creation failed!"
-            exit 1
+            echo "Tag $TAG already exists on remote"
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🎉 Create/Update Release
         run: |
@@ -52,9 +66,10 @@ jobs:
           ZIP_NAME="super-elem-pro-v$VERSION.zip"
           TAG="v$VERSION"
           
+          # Using GH_TOKEN for the CLI explicitly
           gh release create "$TAG" "$ZIP_NAME" \
             --title "Super Elem Pro $TAG" \
-            --notes "Automated build for version $VERSION. Pushed to main." \
+            --notes "Automated release for version $VERSION." \
             --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
