@@ -48,7 +48,7 @@ class Settings {
 
         $active_tab      = sanitize_key( $_GET['sep_tab'] ?? 'widgets' );
         $enabled_modules = get_option( 'sep_modules_enabled', sep_get_default_modules() );
-        $all_modules     = \SuperElemPro\Core\Plugin::instance()->loader->get_modules();
+        $all_modules     = \SuperElemPro\Core\Plugin::instance()->get_loader()->get_modules();
 
         ?>
         <div class="wrap sep-settings-page">
