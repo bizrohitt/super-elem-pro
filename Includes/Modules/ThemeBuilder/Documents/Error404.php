@@ -5,7 +5,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class Search extends Document
+class Error404 extends Document
 {
     public static function get_properties(): array
     {
@@ -15,6 +15,6 @@ class Search extends Document
     }
     public static function get_title(): string
     {
-        return __('SEP Search Results', 'super-elem-pro');
+        return __('SEP Error 404', 'super-elem-pro');
     }
 }
