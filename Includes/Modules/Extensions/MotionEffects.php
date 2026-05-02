@@ -28,34 +28,36 @@ class MotionEffects
     /**
      * Available entrance animations.
      */
-    private array $entrance_animations = [
-        '' => __('None', 'super-elem-pro'),
-        'fadeIn' => 'Fade In',
-        'fadeInUp' => 'Fade In Up',
-        'fadeInDown' => 'Fade In Down',
-        'fadeInLeft' => 'Fade In Left',
-        'fadeInRight' => 'Fade In Right',
-        'slideInUp' => 'Slide In Up',
-        'slideInDown' => 'Slide In Down',
-        'slideInLeft' => 'Slide In Left',
-        'slideInRight' => 'Slide In Right',
-        'zoomIn' => 'Zoom In',
-        'zoomInUp' => 'Zoom In Up',
-        'zoomInDown' => 'Zoom In Down',
-        'bounceIn' => 'Bounce In',
-        'bounceInUp' => 'Bounce In Up',
-        'rotateIn' => 'Rotate In',
-        'flipInX' => 'Flip In X',
-        'flipInY' => 'Flip In Y',
-        'lightSpeedInRight' => 'Light Speed Right',
-        'rollIn' => 'Roll In',
-    ];
+    private array $entrance_animations = [];
 
     /**
      * Constructor.
      */
     public function __construct()
     {
+        $this->entrance_animations = [
+            '' => __('None', 'super-elem-pro'),
+            'fadeIn' => 'Fade In',
+            'fadeInUp' => 'Fade In Up',
+            'fadeInDown' => 'Fade In Down',
+            'fadeInLeft' => 'Fade In Left',
+            'fadeInRight' => 'Fade In Right',
+            'slideInUp' => 'Slide In Up',
+            'slideInDown' => 'Slide In Down',
+            'slideInLeft' => 'Slide In Left',
+            'slideInRight' => 'Slide In Right',
+            'zoomIn' => 'Zoom In',
+            'zoomInUp' => 'Zoom In Up',
+            'zoomInDown' => 'Zoom In Down',
+            'bounceIn' => 'Bounce In',
+            'bounceInUp' => 'Bounce In Up',
+            'rotateIn' => 'Rotate In',
+            'flipInX' => 'Flip In X',
+            'flipInY' => 'Flip In Y',
+            'lightSpeedInRight' => 'Light Speed Right',
+            'rollIn' => 'Roll In',
+        ];
+
         add_action('elementor/element/section/section_advanced/after_section_end', [$this, 'add_motion_controls'], 10);
         add_action('elementor/element/container/section_layout/after_section_end', [$this, 'add_motion_controls'], 10);
         add_action('elementor/element/common/_section_responsive/after_section_end', [$this, 'add_motion_controls'], 10);
