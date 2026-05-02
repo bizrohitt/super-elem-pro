@@ -53,20 +53,39 @@ define('SEP_TEMPLATES_DIR', SEP_PLUGIN_DIR . 'templates/');
 define('SEP_MODULES_DIR', SEP_PLUGIN_DIR . 'includes/Modules/');
 
 // ============================================================
-// COMPOSER AUTOLOADER
+// AUTOLOADER
 // ============================================================
+/**
+ * Register a custom PSR-4 autoloader for the SuperElemPro namespace.
+ * This allows the plugin to work without running 'composer install'
+ * while still maintaining compatibility if composer is used.
+ */
 if (file_exists(SEP_PLUGIN_DIR . 'vendor/autoload.php')) {
     require_once SEP_PLUGIN_DIR . 'vendor/autoload.php';
 } else {
-    // Show admin notice if composer install has not been run
-    add_action('admin_notices', function () {
-        echo '<div class="notice notice-error"><p>';
-        echo '<strong>Super Elem Pro:</strong> Composer autoloader not found. ';
-        echo 'Please run <code>composer install</code> in the plugin directory.';
-        echo '</p></div>';
+    spl_autoload_register(function ($class) {
+        $prefix = 'SuperElemPro\\';
+        $base_dir = SEP_PLUGIN_DIR . 'includes/';
+
+        // Check if the class uses the prefix
+        $len = strlen($prefix);
+        if (strncmp($prefix, $class, $len) !== 0) {
+            return;
+        }
+
+        // Get the relative class name
+        $relative_class = substr($class, $len);
+
+        // Replace namespace separators with directory separators and append .php
+        $file = $base_dir . str_replace('\\', '/', $relative_class) . '.php';
+
+        // If the file exists, require it
+        if (file_exists($file)) {
+            require_once $file;
+        }
     });
-    return;
 }
+
 
 // ============================================================
 // COMPATIBILITY CHECKS
