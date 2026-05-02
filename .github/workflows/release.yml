@@ -44,5 +44,5 @@ jobs:
           name: "Super Elem Pro v${{ steps.get_version.outputs.VER }}"
           body: "Automated build for version ${{ steps.get_version.outputs.VER }}. Pushed to main."
           allowUpdates: true
-          overwrite: true
+          replacesArtifacts: true
           token: ${{ secrets.GITHUB_TOKEN }}
