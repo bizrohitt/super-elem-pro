@@ -171,7 +171,7 @@ class Loader
      *
      * @return void
      */
-    public function load_modules(): void
+    public function init(): void
     {
 
         foreach ($this->modules as $key => $module) {
